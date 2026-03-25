@@ -8,5 +8,5 @@ if (!connectionString) {
   throw new Error("Missing DATABASE_URL env var");
 }
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, { prepare: false });
 export const db = drizzle(client, { schema });
