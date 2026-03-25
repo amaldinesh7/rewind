@@ -1,48 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock supabase before importing the app
-vi.mock("../src/lib/supabase", () => {
-  const mockInsert = vi.fn();
-  const mockSelect = vi.fn();
+// Mock the database
+vi.mock("../src/db", () => {
+  const mockReturning = vi.fn().mockResolvedValue([{
+    id: "test-uuid-123",
+    status: "inbox",
+    createdAt: new Date("2026-03-26T00:00:00Z"),
+  }]);
 
   return {
-    supabase: {
-      from: vi.fn(() => ({
-        insert: mockInsert.mockReturnValue({
-          select: mockSelect.mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: {
-                id: "test-uuid-123",
-                status: "inbox",
-                created_at: "2026-03-26T00:00:00Z",
-              },
-              error: null,
-            }),
+    db: {
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: mockReturning,
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: mockReturning,
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: {
-                  id: "test-uuid-123",
-                  status: "inbox",
-                  created_at: "2026-03-26T00:00:00Z",
-                },
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      })),
-      storage: {
-        from: vi.fn(() => ({
-          upload: vi.fn().mockResolvedValue({ data: { path: "test" }, error: null }),
-        })),
-      },
+      }),
     },
   };
 });
+
+// Mock supabase (storage only)
+vi.mock("../src/lib/supabase", () => ({
+  supabase: {
+    storage: {
+      from: vi.fn(() => ({
+        upload: vi.fn().mockResolvedValue({ data: { path: "test" }, error: null }),
+      })),
+    },
+  },
+}));
 
 import { Hono } from "hono";
 import { captureRoute } from "../src/routes/capture";

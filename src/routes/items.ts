@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import { supabase } from "../lib/supabase";
+import { db } from "../db";
+import { items } from "../db/schema";
+import { eq, ne, and, desc, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth";
 
 export const itemsRoute = new Hono();
@@ -13,32 +15,28 @@ itemsRoute.get("/api/items", authMiddleware, async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") || "20"), 100);
   const offset = parseInt(c.req.query("offset") || "0");
 
-  let query = supabase
-    .from("items")
-    .select("*", { count: "exact" });
+  const conditions = [];
 
-  // Always exclude deleted unless explicitly requested
   if (status) {
-    query = query.eq("status", status);
+    conditions.push(eq(items.status, status));
   } else {
-    query = query.neq("status", "deleted");
+    conditions.push(ne(items.status, "deleted"));
   }
 
   if (platform) {
-    query = query.eq("source_platform", platform);
+    conditions.push(eq(items.sourcePlatform, platform));
   }
 
-  query = query.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+  const where = conditions.length > 1 ? and(...conditions) : conditions[0];
 
-  const { data, error, count } = await query;
-
-  if (error) {
-    return c.json({ error: "Failed to fetch items" }, 500);
-  }
+  const [data, countResult] = await Promise.all([
+    db.select().from(items).where(where).orderBy(desc(items.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(items).where(where),
+  ]);
 
   return c.json({
-    items: data || [],
-    total: count || 0,
+    items: data,
+    total: Number(countResult[0].count),
     limit,
     offset,
   });
@@ -46,27 +44,22 @@ itemsRoute.get("/api/items", authMiddleware, async (c) => {
 
 // Get single item
 itemsRoute.get("/api/items/:id", authMiddleware, async (c) => {
-  const id = c.req.param("id");
+  const id = c.req.param("id") as string;
 
-  const { data, error } = await supabase
-    .from("items")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [row] = await db.select().from(items).where(eq(items.id, id));
 
-  if (error || !data) {
+  if (!row) {
     return c.json({ error: "Item not found" }, 404);
   }
 
-  return c.json(data);
+  return c.json(row);
 });
 
 // Update item
 itemsRoute.patch("/api/items/:id", authMiddleware, async (c) => {
-  const id = c.req.param("id");
+  const id = c.req.param("id") as string;
   const body = await c.req.json();
 
-  // Only allow updating specific fields
   const updates: Record<string, unknown> = {};
   for (const key of Object.keys(body)) {
     if (!ALLOWED_UPDATE_FIELDS.includes(key)) {
@@ -79,16 +72,14 @@ itemsRoute.patch("/api/items/:id", authMiddleware, async (c) => {
     return c.json({ error: "No valid fields to update" }, 400);
   }
 
-  const { data, error } = await supabase
-    .from("items")
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single();
+  // Handle updated_at in application code (no database trigger)
+  updates.updatedAt = new Date();
 
-  if (error || !data) {
+  const [row] = await db.update(items).set(updates).where(eq(items.id, id)).returning();
+
+  if (!row) {
     return c.json({ error: "Item not found" }, 404);
   }
 
-  return c.json(data);
+  return c.json(row);
 });

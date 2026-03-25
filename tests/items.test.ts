@@ -1,10 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockFrom = vi.fn();
+const mockSelect = vi.fn();
+const mockInsert = vi.fn();
+const mockUpdate = vi.fn();
 
-vi.mock("../src/lib/supabase", () => ({
-  supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
+vi.mock("../src/db", () => ({
+  db: {
+    select: (...args: unknown[]) => mockSelect(...args),
+    insert: (...args: unknown[]) => mockInsert(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
+  },
+}));
+
+// Also mock the schema to avoid import issues
+vi.mock("../src/db/schema", () => ({
+  items: {
+    id: "id",
+    status: "status",
+    sourcePlatform: "source_platform",
+    createdAt: "created_at",
   },
 }));
 
@@ -31,31 +45,28 @@ describe("GET /api/items", () => {
   });
 
   it("returns paginated items", async () => {
-    const mockQuery = {
-      select: vi.fn().mockReturnValue({
-        neq: vi.fn().mockReturnValue({
-          order: vi.fn().mockReturnValue({
-            range: vi.fn().mockResolvedValue({
-              data: [{ id: "1", status: "inbox" }],
-              error: null,
-              count: 1,
-            }),
-          }),
-        }),
-        eq: vi.fn().mockReturnValue({
-          neq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              range: vi.fn().mockResolvedValue({
-                data: [{ id: "1", status: "inbox" }],
-                error: null,
-                count: 1,
-              }),
+    const chainMock = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              offset: vi.fn().mockResolvedValue([{ id: "1", status: "inbox" }]),
             }),
           }),
         }),
       }),
     };
-    mockFrom.mockReturnValue(mockQuery);
+    const countChainMock = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ count: 1 }]),
+      }),
+    };
+
+    let callCount = 0;
+    mockSelect.mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? chainMock : countChainMock;
+    });
 
     const res = await app.request("/api/items", { headers: authHeader });
 
@@ -82,14 +93,9 @@ describe("GET /api/items/:id", () => {
   });
 
   it("returns a single item", async () => {
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: { id: "test-id", status: "inbox" },
-            error: null,
-          }),
-        }),
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: "test-id", status: "inbox" }]),
       }),
     });
 
@@ -100,14 +106,9 @@ describe("GET /api/items/:id", () => {
   });
 
   it("returns 404 for missing item", async () => {
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: null,
-            error: { code: "PGRST116" },
-          }),
-        }),
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
       }),
     });
 
@@ -125,15 +126,10 @@ describe("PATCH /api/items/:id", () => {
   });
 
   it("updates allowed fields", async () => {
-    mockFrom.mockReturnValue({
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { id: "test-id", status: "archived" },
-              error: null,
-            }),
-          }),
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: "test-id", status: "archived" }]),
         }),
       }),
     });

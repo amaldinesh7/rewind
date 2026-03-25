@@ -1,0 +1,20 @@
+CREATE TABLE "items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"source_type" text NOT NULL,
+	"source_platform" text DEFAULT 'manual',
+	"raw_url" text,
+	"raw_text" text,
+	"raw_image_path" text,
+	"raw_voice_path" text,
+	"note" text,
+	"status" text DEFAULT 'inbox' NOT NULL,
+	"title" text,
+	"summary" text,
+	"thumbnail_url" text,
+	"content_type" text,
+	"ai_tags" text[],
+	"ai_category" text,
+	"estimated_mins" integer
+);
