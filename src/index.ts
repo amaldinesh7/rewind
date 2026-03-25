@@ -3,13 +3,18 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { serve } from "@hono/node-server";
 import "dotenv/config";
+import { healthRoute } from "./routes/health";
+import { captureRoute } from "./routes/capture";
+import { itemsRoute } from "./routes/items";
 
 const app = new Hono();
 
 app.use("*", logger());
 app.use("*", cors());
 
-app.get("/", (c) => c.json({ message: "Rewind API" }));
+app.route("/", healthRoute);
+app.route("/", captureRoute);
+app.route("/", itemsRoute);
 
 const port = parseInt(process.env.PORT || "3000");
 console.log(`Server running on port ${port}`);
