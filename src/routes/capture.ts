@@ -5,6 +5,7 @@ import { items } from "../db/schema";
 import { supabase } from "../lib/supabase";
 import { detectPlatform } from "../lib/platform";
 import { validateCaptureRequest } from "../lib/validation";
+import { enrichItem } from "../lib/enrichment";
 import { authMiddleware } from "../middleware/auth";
 
 export const captureRoute = new Hono();
@@ -25,7 +26,13 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
         sourcePlatform: platform,
         rawUrl: body.url,
         note: body.note || null,
+        enrichmentStatus: "pending",
       }).returning();
+
+      // Fire-and-forget enrichment
+      enrichItem(row.id, body.url).catch((err) =>
+        console.error("Enrichment error:", err)
+      );
 
       return c.json({
         id: row.id,

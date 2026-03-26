@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db } from "../db";
 import { items } from "../db/schema";
 import { eq, ne, and, desc, sql } from "drizzle-orm";
+import { platformMetadata } from "../db/platform-metadata";
 import { authMiddleware } from "../middleware/auth";
 
 export const itemsRoute = new Hono();
@@ -52,7 +53,20 @@ itemsRoute.get("/api/items/:id", authMiddleware, async (c) => {
     return c.json({ error: "Item not found" }, 404);
   }
 
-  return c.json(row);
+  // Fetch platform metadata if exists
+  const [meta] = await db.select().from(platformMetadata).where(eq(platformMetadata.itemId, id));
+
+  return c.json({
+    ...row,
+    platformMetadata: meta ? {
+      platform: meta.platform,
+      ogTitle: meta.ogTitle,
+      ogDescription: meta.ogDescription,
+      ogImage: meta.ogImage,
+      ogSiteName: meta.ogSiteName,
+      platformData: meta.platformData,
+    } : null,
+  });
 });
 
 // Update item
