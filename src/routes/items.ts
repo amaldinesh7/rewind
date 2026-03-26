@@ -13,6 +13,8 @@ const ALLOWED_UPDATE_FIELDS = ["status", "note", "title"];
 itemsRoute.get("/api/items", authMiddleware, async (c) => {
   const status = c.req.query("status");
   const platform = c.req.query("platform");
+  const category = c.req.query("category");
+  const source = c.req.query("source");
   const limit = Math.min(parseInt(c.req.query("limit") || "20"), 100);
   const offset = parseInt(c.req.query("offset") || "0");
 
@@ -26,6 +28,19 @@ itemsRoute.get("/api/items", authMiddleware, async (c) => {
 
   if (platform) {
     conditions.push(eq(items.sourcePlatform, platform));
+  }
+
+  if (category) {
+    conditions.push(eq(items.aiCategory, category));
+  }
+
+  if (source) {
+    // source=text/voice/image filters by sourceType, others by sourcePlatform
+    if (["text", "voice", "image"].includes(source)) {
+      conditions.push(eq(items.sourceType, source));
+    } else {
+      conditions.push(eq(items.sourcePlatform, source));
+    }
   }
 
   const where = conditions.length > 1 ? and(...conditions) : conditions[0];

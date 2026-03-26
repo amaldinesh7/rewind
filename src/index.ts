@@ -6,6 +6,7 @@ import "dotenv/config";
 import { healthRoute } from "./routes/health";
 import { captureRoute } from "./routes/capture";
 import { itemsRoute } from "./routes/items";
+import { libraryRoute } from "./routes/library";
 
 const app = new Hono();
 
@@ -15,6 +16,7 @@ app.use("*", cors());
 app.route("/", healthRoute);
 app.route("/", captureRoute);
 app.route("/", itemsRoute);
+app.route("/", libraryRoute);
 
 const port = parseInt(process.env.PORT || "3000");
 console.log(`Server running on port ${port}`);
