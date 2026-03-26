@@ -27,4 +27,8 @@ export const items = pgTable("items", {
   aiTags: text("ai_tags").array(),
   aiCategory: text("ai_category"),
   estimatedMins: integer("estimated_mins"),
+
+  // Enrichment
+  enrichmentStatus: text("enrichment_status").default("none"),
+  enrichedAt: timestamp("enriched_at", { withTimezone: true }),
 });
