@@ -69,10 +69,10 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
         note: body.note || null,
       }).returning();
 
-      const storagePath = `screenshots/${row.id}.png`;
+      const storagePath = `screenshots/${row.id}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("captures")
-        .upload(storagePath, imageBuffer, { contentType: "image/png" });
+        .upload(storagePath, imageBuffer, { contentType: "image/jpeg" });
 
       if (uploadError) {
         return c.json({ error: "Failed to upload image" }, 500);
