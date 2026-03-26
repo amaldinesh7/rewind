@@ -15,23 +15,24 @@ export async function summarizeWithAI(input: {
 }): Promise<AIResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.warn("[ai-summarize] No GEMINI_API_KEY set, using fallback");
     return fallback(input.description);
   }
 
-  const prompt = `Analyze this web content and return JSON only, no markdown:
+  const prompt = `You are a content classifier. Analyze this web page and return a JSON object.
 
 URL: ${input.url}
 Title: ${input.title || "unknown"}
 Description: ${input.description || "none"}
 Platform: ${input.platform}
 
-Return exactly this JSON format:
-{
-  "summary": "1-2 sentence summary of the content",
-  "tags": ["tag1", "tag2", "tag3"],
-  "category": "one of: Tech, Entertainment, News, Fashion, Food, Finance, Health, Sports, Education, Travel, Shopping, Social, Other",
-  "contentType": "one of: article, video, image, discussion, product, profile, other"
-}`;
+You MUST return a valid JSON object with these exact fields:
+- "summary": A 1-2 sentence summary describing what this content is about.
+- "tags": An array of 3-5 short lowercase keyword tags relevant to the content (e.g. ["coding", "ai", "developer-tools"]).
+- "category": Exactly one of these values: Tech, Entertainment, News, Fashion, Food, Finance, Health, Sports, Education, Travel, Shopping, Social, Other.
+- "contentType": Exactly one of these values: article, video, image, discussion, product, profile, other.
+
+Important: Return ONLY the JSON object. No markdown, no code fences, no explanation.`;
 
   try {
     const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
@@ -41,32 +42,56 @@ Return exactly this JSON format:
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 300,
+          maxOutputTokens: 500,
+          responseMimeType: "application/json",
         },
       }),
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "unknown");
+      console.error(`[ai-summarize] Gemini API error ${response.status}: ${errorText}`);
       return fallback(input.description);
     }
 
     const data = await response.json();
+
+    // Check for blocked or empty responses
+    if (data.candidates?.[0]?.finishReason === "SAFETY") {
+      console.warn("[ai-summarize] Gemini blocked response for safety reasons");
+      return fallback(input.description);
+    }
+
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return fallback(input.description);
+    if (!text) {
+      console.warn("[ai-summarize] No text in Gemini response:", JSON.stringify(data).slice(0, 500));
+      return fallback(input.description);
+    }
 
-    // Extract JSON from response (Gemini may wrap in ```json blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return fallback(input.description);
+    // With responseMimeType: "application/json", Gemini should return clean JSON.
+    // But as a safety net, also try extracting from markdown fences.
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      // Try extracting JSON from markdown code fences or loose text
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+      if (!jsonMatch) {
+        console.warn("[ai-summarize] Could not extract JSON from response:", text.slice(0, 300));
+        return fallback(input.description);
+      }
+      parsed = JSON.parse(jsonMatch[1]);
+    }
 
-    const parsed = JSON.parse(jsonMatch[0]);
     return {
-      summary: parsed.summary || input.description || "",
-      tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [],
-      category: parsed.category || "Other",
-      contentType: parsed.contentType || "other",
+      summary: (parsed.summary as string) || input.description || "",
+      tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]).slice(0, 5) : [],
+      category: (parsed.category as string) || "Other",
+      contentType: (parsed.contentType as string) || "other",
     };
-  } catch {
+  } catch (err) {
+    console.error("[ai-summarize] Error:", err instanceof Error ? err.message : err);
     return fallback(input.description);
   }
 }
