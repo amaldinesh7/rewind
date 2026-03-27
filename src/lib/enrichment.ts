@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { items } from "../db/schema";
 import { platformMetadata } from "../db/platform-metadata";
-import { fetchOG } from "./og-parser";
+import { fetchOGWithFallback } from "./og-parser";
 import { detectPlatform } from "./platform";
 import { extractPlatformData } from "./platform-extract";
 import { summarizeWithAI } from "./ai-summarize";
@@ -14,9 +14,9 @@ export async function enrichItem(itemId: string, rawUrl: string): Promise<void> 
       .set({ enrichmentStatus: "processing" })
       .where(eq(items.id, itemId));
 
-    // Phase 1: OG metadata (fast)
-    const og = await fetchOG(rawUrl);
+    // Phase 1: OG metadata (fast) — detect platform first for oEmbed fallback
     const platform = detectPlatform(rawUrl);
+    const og = await fetchOGWithFallback(rawUrl, platform);
 
     // Update title + thumbnail immediately
     const phase1Updates: Record<string, unknown> = {};

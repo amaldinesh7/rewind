@@ -60,3 +60,52 @@ export async function fetchOG(url: string): Promise<OGData> {
     return {};
   }
 }
+
+async function fetchInstagramOEmbed(url: string): Promise<OGData> {
+  try {
+    const oembed = `https://noembed.com/embed?url=${encodeURIComponent(url)}`;
+    const response = await fetch(oembed, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return {};
+    const data = await response.json();
+    return {
+      title: data.author_name ? `${data.author_name} on Instagram` : data.title || undefined,
+      description: data.title || undefined,
+      image: data.thumbnail_url || undefined,
+      siteName: "Instagram",
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function fetchYouTubeOEmbed(url: string): Promise<OGData> {
+  try {
+    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const response = await fetch(oembed, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return {};
+    const data = await response.json();
+    return {
+      title: data.title || undefined,
+      image: data.thumbnail_url || undefined,
+      siteName: "YouTube",
+    };
+  } catch {
+    return {};
+  }
+}
+
+export async function fetchOGWithFallback(url: string, platform: string): Promise<OGData> {
+  const og = await fetchOG(url);
+
+  if (platform === "instagram" && !og.title && !og.image) {
+    const oembed = await fetchInstagramOEmbed(url);
+    return { ...og, ...oembed };
+  }
+
+  if (platform === "youtube" && !og.title) {
+    const oembed = await fetchYouTubeOEmbed(url);
+    return { ...og, ...oembed };
+  }
+
+  return og;
+}
