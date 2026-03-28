@@ -20,7 +20,7 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
 
   switch (body.type) {
     case "url": {
-      const platform = body.source_platform || detectPlatform(body.url);
+      const platform = detectPlatform(body.url);
       const [row] = await db.insert(items).values({
         sourceType: "url",
         sourcePlatform: platform,
