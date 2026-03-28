@@ -5,7 +5,7 @@ import { items } from "../db/schema";
 import { supabase } from "../lib/supabase";
 import { detectPlatform } from "../lib/platform";
 import { validateCaptureRequest } from "../lib/validation";
-import { enrichItem } from "../lib/enrichment";
+import { enrichItem, enrichTextItem } from "../lib/enrichment";
 import { authMiddleware } from "../middleware/auth";
 
 export const captureRoute = new Hono();
@@ -48,7 +48,13 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
         sourcePlatform: body.source_platform || "manual",
         rawText: body.content,
         note: body.note || null,
+        enrichmentStatus: "pending",
       }).returning();
+
+      // Fire-and-forget text enrichment
+      enrichTextItem(row.id, body.content).catch((err) =>
+        console.error("Text enrichment error:", err)
+      );
 
       return c.json({
         id: row.id,
@@ -62,33 +68,30 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
       const imageData = body.image_base64.replace(/^data:image\/\w+;base64,/, "");
       const imageBuffer = Buffer.from(imageData, "base64");
 
-      const [row] = await db.insert(items).values({
-        sourceType: "image",
-        sourcePlatform: body.source_platform || "screenshot",
-        rawImagePath: "pending",
-        note: body.note || null,
-      }).returning();
-
-      const storagePath = `screenshots/${row.id}.jpg`;
+      // Upload to Supabase FIRST, then create DB row with real path
+      const imageId = crypto.randomUUID();
+      const storagePath = `screenshots/${imageId}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("captures")
         .upload(storagePath, imageBuffer, { contentType: "image/jpeg" });
 
       if (uploadError) {
-        await db.delete(items).where(eq(items.id, row.id));
         return c.json({ error: "Failed to upload image" }, 500);
       }
 
-      const [updated] = await db.update(items)
-        .set({ rawImagePath: storagePath })
-        .where(eq(items.id, row.id))
-        .returning();
+      const [row] = await db.insert(items).values({
+        sourceType: "image",
+        sourcePlatform: body.source_platform || "screenshot",
+        rawImagePath: storagePath,
+        note: body.note || null,
+        enrichmentStatus: "done",
+      }).returning();
 
       return c.json({
-        id: updated.id,
-        status: updated.status,
-        created_at: updated.createdAt.toISOString(),
-        message: "Captured. Processing will happen in background.",
+        id: row.id,
+        status: row.status,
+        created_at: row.createdAt.toISOString(),
+        message: "Captured.",
       }, 201);
     }
 
@@ -96,33 +99,30 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
       const audioData = body.audio_base64.replace(/^data:audio\/\w+;base64,/, "");
       const audioBuffer = Buffer.from(audioData, "base64");
 
-      const [row] = await db.insert(items).values({
-        sourceType: "voice",
-        sourcePlatform: body.source_platform || "voice_memo",
-        rawVoicePath: "pending",
-        note: body.note || null,
-      }).returning();
-
-      const storagePath = `voice/${row.id}.m4a`;
+      // Upload to Supabase FIRST, then create DB row with real path
+      const voiceId = crypto.randomUUID();
+      const storagePath = `voice/${voiceId}.m4a`;
       const { error: uploadError } = await supabase.storage
         .from("captures")
         .upload(storagePath, audioBuffer, { contentType: "audio/mp4" });
 
       if (uploadError) {
-        await db.delete(items).where(eq(items.id, row.id));
         return c.json({ error: "Failed to upload audio" }, 500);
       }
 
-      const [updated] = await db.update(items)
-        .set({ rawVoicePath: storagePath })
-        .where(eq(items.id, row.id))
-        .returning();
+      const [row] = await db.insert(items).values({
+        sourceType: "voice",
+        sourcePlatform: body.source_platform || "voice_memo",
+        rawVoicePath: storagePath,
+        note: body.note || null,
+        enrichmentStatus: "done",
+      }).returning();
 
       return c.json({
-        id: updated.id,
-        status: updated.status,
-        created_at: updated.createdAt.toISOString(),
-        message: "Captured. Processing will happen in background.",
+        id: row.id,
+        status: row.status,
+        created_at: row.createdAt.toISOString(),
+        message: "Captured.",
       }, 201);
     }
   }

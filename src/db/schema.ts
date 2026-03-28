@@ -31,4 +31,6 @@ export const items = pgTable("items", {
   // Enrichment
   enrichmentStatus: text("enrichment_status").default("none"),
   enrichedAt: timestamp("enriched_at", { withTimezone: true }),
+  retryCount: integer("retry_count").default(0),
+  processingStartedAt: timestamp("processing_started_at", { withTimezone: true }),
 });

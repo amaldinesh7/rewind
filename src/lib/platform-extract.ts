@@ -12,7 +12,7 @@ export function extractPlatformData(
 ): Record<string, string> {
   switch (platform) {
     case "youtube": return extractYouTube(url);
-    case "reddit": return extractReddit(url);
+    case "reddit": return extractReddit(url, og);
     case "twitter": return extractTwitter(url);
     case "instagram": return extractInstagram(url, og);
     case "linkedin": return extractLinkedIn(og);
@@ -39,12 +39,16 @@ function extractYouTube(url: string): Record<string, string> {
   return result;
 }
 
-function extractReddit(url: string): Record<string, string> {
+function extractReddit(url: string, og: OGPartial): Record<string, string> {
   const result: Record<string, string> = {};
 
   const subredditMatch = url.match(/reddit\.com\/(r\/[^/]+)/);
   if (subredditMatch) {
     result.subreddit = subredditMatch[1];
+  }
+
+  if (og.siteName && og.siteName.startsWith("r/")) {
+    result.subreddit = og.siteName;
   }
 
   return result;

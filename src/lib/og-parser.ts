@@ -1,3 +1,5 @@
+import { fetchRedditJSON, fetchVxTwitter, fetchTikTokOEmbed, fetchNoembedFallback } from "./platform-fetchers";
+
 export interface OGData {
   title?: string;
   description?: string;
@@ -95,8 +97,41 @@ async function fetchYouTubeOEmbed(url: string): Promise<OGData> {
 }
 
 export async function fetchOGWithFallback(url: string, platform: string): Promise<OGData> {
+  // Step 1: Try platform-specific API first
+  let platformData: OGData = {};
+  if (platform === "reddit") {
+    platformData = await fetchRedditJSON(url);
+  } else if (platform === "twitter") {
+    platformData = await fetchVxTwitter(url);
+  } else if (platform === "tiktok") {
+    platformData = await fetchTikTokOEmbed(url);
+  }
+
+  // Step 2: Standard OG scraping
   const og = await fetchOG(url);
 
+  // If platform API returned a title, merge: platform API takes priority, OG image as fallback
+  if (platformData.title) {
+    const merged: OGData = {
+      ...og,
+      ...platformData,
+      image: platformData.image ?? og.image,
+    };
+
+    // Step 3: Existing oEmbed fallbacks for Instagram and YouTube
+    if (platform === "instagram" && !merged.title && !merged.image) {
+      const oembed = await fetchInstagramOEmbed(url);
+      return { ...merged, ...oembed };
+    }
+    if (platform === "youtube" && !merged.title) {
+      const oembed = await fetchYouTubeOEmbed(url);
+      return { ...merged, ...oembed };
+    }
+
+    return merged;
+  }
+
+  // Step 3: Existing oEmbed fallbacks for Instagram and YouTube
   if (platform === "instagram" && !og.title && !og.image) {
     const oembed = await fetchInstagramOEmbed(url);
     return { ...og, ...oembed };
@@ -105,6 +140,12 @@ export async function fetchOGWithFallback(url: string, platform: string): Promis
   if (platform === "youtube" && !og.title) {
     const oembed = await fetchYouTubeOEmbed(url);
     return { ...og, ...oembed };
+  }
+
+  // Step 4: If still no title AND no image, try fetchNoembedFallback as last resort
+  if (!og.title && !og.image) {
+    const noembed = await fetchNoembedFallback(url);
+    return { ...og, ...noembed };
   }
 
   return og;

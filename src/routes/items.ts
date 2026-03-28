@@ -112,3 +112,12 @@ itemsRoute.patch("/api/items/:id", authMiddleware, async (c) => {
 
   return c.json(row);
 });
+
+itemsRoute.post("/api/reprocess", authMiddleware, async (c) => {
+  const updated = await db.update(items)
+    .set({ enrichmentStatus: "pending", retryCount: 0, processingStartedAt: null })
+    .where(eq(items.enrichmentStatus, "failed"))
+    .returning({ id: items.id });
+
+  return c.json({ requeued: updated.length });
+});

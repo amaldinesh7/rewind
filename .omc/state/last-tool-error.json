@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx tsx -e \\\"\\nimport { db } from './src/db/index.js';\\nimport { sql } from 'drizzle-orm';\\n\\nasync function run() {\\n  await db.execute(sql\\\\`ALTER TABLE items ADD COLUMN IF NOT EXISTS re...",
+  "error": "Exit code 1\n/Users/amal.dinesh@postman.com/Teststation/Rewind/rewind-api/node_modules/tsx/dist/register-D46fvsV_.cjs:3\n`)},\"createLog\"),x=I(g.bgLightYellow(g.black(\" CJS \"))),ae=I(g.bgBlue(\" ESM \")),oe=[\".cts\",\".mts\",\".ts\",\".tsx\",\".jsx\"],ie=[\".js\",\".cjs\",\".mjs\"],k=[\".ts\",\".tsx\",\".jsx\"],F=o((s,e,r,n)=>{const t=Object.getOwnPropertyDescriptor(s,e);t?.set?s[e]=r:(!t||t.configurable)&&Object.defineProperty(s,e,{value:r,enumerable:t?.enumerable||n?.enumerable,writable:n?.writable??(t?t.writable:!0),c...",
+  "timestamp": "2026-03-28T21:22:23.786Z",
+  "retry_count": 2
+}

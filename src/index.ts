@@ -7,6 +7,7 @@ import { healthRoute } from "./routes/health";
 import { captureRoute } from "./routes/capture";
 import { itemsRoute } from "./routes/items";
 import { libraryRoute } from "./routes/library";
+import { startEnrichmentQueue } from "./lib/enrichment-queue";
 
 const app = new Hono();
 
@@ -21,5 +22,6 @@ app.route("/", libraryRoute);
 const port = parseInt(process.env.PORT || "3000");
 console.log(`Server running on port ${port}`);
 serve({ fetch: app.fetch, port });
+startEnrichmentQueue();
 
 export default app;
