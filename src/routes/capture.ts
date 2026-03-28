@@ -75,6 +75,7 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
         .upload(storagePath, imageBuffer, { contentType: "image/jpeg" });
 
       if (uploadError) {
+        await db.delete(items).where(eq(items.id, row.id));
         return c.json({ error: "Failed to upload image" }, 500);
       }
 
@@ -108,6 +109,7 @@ captureRoute.post("/api/capture", authMiddleware, async (c) => {
         .upload(storagePath, audioBuffer, { contentType: "audio/mp4" });
 
       if (uploadError) {
+        await db.delete(items).where(eq(items.id, row.id));
         return c.json({ error: "Failed to upload audio" }, 500);
       }
 

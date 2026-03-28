@@ -17,10 +17,10 @@ export function validateCaptureRequest(body: Record<string, unknown>): Validatio
       if (!body.content) return { valid: false, error: "content is required for type 'text'" };
       break;
     case "image":
-      if (!body.image_base64) return { valid: false, error: "image_base64 is required for type 'image'" };
+      if (!body.image_base64 || typeof body.image_base64 !== "string") return { valid: false, error: "image_base64 must be a non-empty string for type 'image'" };
       break;
     case "voice":
-      if (!body.audio_base64) return { valid: false, error: "audio_base64 is required for type 'voice'" };
+      if (!body.audio_base64 || typeof body.audio_base64 !== "string") return { valid: false, error: "audio_base64 must be a non-empty string for type 'voice'" };
       break;
   }
 
